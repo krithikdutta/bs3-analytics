@@ -1,0 +1,20 @@
+# Ignore logs
+logs/
+*.log
+
+# Ignore IDE/editor specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+*.swn
+
+# Ignore Python cache files
+__pycache__/
+*.pyc
+*.pyo
+
+# Ignore data and output files
+data/
+out/
