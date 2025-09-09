@@ -81,10 +81,10 @@ class PredictionModel:
         self._load_data()
         pred_df, coef_df, diagnostics = self._train()
         metrics = self._evaluate(pred_df)
-        
+
         # Save model and generate report
         self.save()
-        self.generate_report(pred_df, coef_df, metrics, diagnostics)
+        self._generate_report(pred_df, coef_df, metrics, diagnostics)
         return True
     
     def _load_data(self):

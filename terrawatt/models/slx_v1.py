@@ -24,7 +24,7 @@ from libpysal.weights import Queen, KNN
 from libpysal.weights import lag_spatial
 from esda.moran import Moran
 
-from terrawatt import PredictionModel
+from terrawatt.models.terrawatt import PredictionModel
 
 warnings.filterwarnings("ignore")
 
@@ -77,7 +77,6 @@ class SLXLogitModel(PredictionModel):
         
         self.logger = logging.getLogger(__name__)
         self.logger.info("SLX Logit Model initialized")
-        self.logger.info(f"Configuration loaded from {self.config_path}")
 
     def _check_compatibility(self):
         """Check if the model kind is compatible."""
