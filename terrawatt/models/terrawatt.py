@@ -85,6 +85,8 @@ class PredictionModel:
         # Save model and generate report
         self.save()
         self._generate_report(pred_df, coef_df, metrics, diagnostics)
+
+        self._predict()
         return True
     
     def _load_data(self):

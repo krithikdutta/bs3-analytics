@@ -3,7 +3,7 @@ data:
   datadir: 'data'
   xtrain_path: 'BLR_X_normalized.csv'
   ytrain_path: 'BLR_Y.csv'
-  xval_path: 'RPR_X_normalized.csv'
+  xpred_path: 'RPR_X_normalized.csv'
   predictors: ['ndbi_mean', 'ntl_mean', 'ghi_mean', 'road_density_norm', 'poi_norm']
   target: 'num_bss'
   id_field: 'id'
