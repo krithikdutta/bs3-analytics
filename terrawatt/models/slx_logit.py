@@ -24,12 +24,11 @@ from libpysal.weights import Queen, KNN
 from libpysal.weights import lag_spatial
 from esda.moran import Moran
 
-from terrawatt.models.terrawatt import PredictionModel
+import terrawatt.models.terrawatt as twm
 
 warnings.filterwarnings("ignore")
 
-
-class SLXLogitModel(PredictionModel):
+class SLXLogitModel(twm.PredictionModel):
     """Spatial Lag of X Logistic Regression Model."""
     
     def __init__(self, config_path="config.yaml"):
