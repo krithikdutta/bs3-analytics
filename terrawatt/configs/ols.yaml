@@ -24,12 +24,12 @@ training:
 
 # Model parameters
 model:
-  name: 'SLX_v1'
+  name: 'OLS_v1'
   kind: 'inference'
-  link: 'logit'
+  link: 'linear'
   threshold: 0.5
   scale: True
-  lag_order: 1
+  lag_order: 0
 
 # Output parameters
 output:
@@ -43,5 +43,5 @@ output:
 # Logging and checkpoints
 logging:
   logdir: 'logs'
-  logpath: 'training.log'
+  logpath: 'ols.log'
   level: 'info'

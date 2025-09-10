@@ -22,8 +22,8 @@ class InferenceModel:
         """
         self._load_data()
         self._train()
-        self._evaluate_model()
-        return self._generate_report()
+        self._perform_diagnostics()
+        return True
     
     def _load_data(self):
         """
@@ -41,21 +41,13 @@ class InferenceModel:
         """
         raise NotImplementedError("Must implement model training")
     
-    def _evaluate_model(self):
+    def _perform_diagnostics(self):
         """
         Evaluates the model's performance on the test data.
 
         This method must be implemented by subclasses.
         """
         raise NotImplementedError("Must implement model evaluation")
-    
-    def _generate_report(self):
-        """
-        Generates a report summarizing the model's performance and diagnostics.
-
-        This method must be implemented by subclasses.
-        """
-        raise NotImplementedError("Must implement report generation")
     
 
 class PredictionModel:
