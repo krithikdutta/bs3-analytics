@@ -1,0 +1,47 @@
+# Data parameters
+data:
+  datadir: 'data'
+  xtrain_path: 'BLR_X_normalized.csv'
+  ytrain_path: 'BLR_Y.csv'
+  xval_path: 'RPR_X_normalized.csv'
+  predictors: ['ndbi_mean', 'ntl_mean', 'ghi_mean', 'road_density_norm', 'poi_norm']
+  target: 'num_bss'
+  id_field: 'id'
+  coord_cols: ['Longitude', 'Latitude']
+  bbox_cols: ['left', 'top', 'right', 'bottom']
+
+# Feature Engineering parameters
+feature:
+  scaling: 'minmax' # Options: 'minmax', 'standard', 'none'
+  contiguity: 'queen' # Options: 'knn', 'queen', 'rook'
+  n_neighbors: 8 # Used if contiguity is 'knn'
+  imputer: 'median' # Options: 'mean', 'median', 'mode', 'drop', 'none'
+
+# Training parameters
+training:
+  scv_method: 'kfold' # Options: 'kfold', 'stratified', 'group'
+  scv_folds: 5
+
+# Model parameters
+model:
+  name: 'Logit_v1'
+  kind: 'inference'
+  link: 'logit'
+  threshold: 0.5
+  scale: True
+  lag_order: 0
+
+# Output parameters
+output:
+  outdir: 'out_logit'
+  plots: 'diagnostic_plots'
+  coefficients: 'model_coefficients.csv'
+  report: 'evaluation_report.csv'
+  predictions: 'predictions.csv'
+  diagnostics: 'diagnostics.yaml'
+
+# Logging and checkpoints
+logging:
+  logdir: 'logs'
+  logpath: 'logit.log'
+  level: 'info'

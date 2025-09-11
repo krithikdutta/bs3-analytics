@@ -1,6 +1,6 @@
 """
-OLS Model Module
-Ordinary Least Squares (OLS) Regression implementation with spatial cross-validation using statsmodels.
+Logit Model Module
+Logistic Regression implementation with spatial cross-validation using statsmodels.
 """
 
 import os
@@ -15,11 +15,14 @@ import geopandas as gpd
 from shapely.geometry import Polygon
 
 import statsmodels.api as sm
+# from statsmodels.stats.diagnostic import het_breuschpagan, het_white
+# from statsmodels.stats.stattools import durbin_watson, jarque_bera
+# from statsmodels.tsa.stattools import acf
 
 from sklearn.cluster import KMeans
 
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from sklearn.metrics import accuracy_score, log_loss
 
 from libpysal.weights import Queen, KNN
 from libpysal.weights import lag_spatial
@@ -29,13 +32,17 @@ import terrawatt.models.terrawatt as twm
 
 warnings.filterwarnings("ignore")
 
+def pearson_residuals(y, y_hat):
+    """Calculate Pearson residuals."""
+    return (y - y_hat) / np.sqrt(y_hat * (1 - y_hat))
 
-class OLSModel(twm.InferenceModel):
-    """OLS Regression Model using statsmodels."""
+
+class LogitModel(twm.InferenceModel):
+    """Logistic Regression Model using statsmodels."""
 
     def __init__(self, config_path="config.yaml"):
         """
-        Initialize the OLS model.
+        Initialize the Logit model.
         
         Parameters
         ----------
@@ -52,6 +59,8 @@ class OLSModel(twm.InferenceModel):
         self.y = None
         self.df = None
         self.w = None
+        self.residuals = None
+        self.predictions = None
         
         # Initialize
         self._load_config(config_path)
@@ -77,13 +86,13 @@ class OLSModel(twm.InferenceModel):
         )
         
         self.logger = logging.getLogger(__name__)
-        self.logger.info("OLS Model initialized")
+        self.logger.info("Logit Model initialized")
 
     def _check_compatibility(self):
         """Check if the model kind is compatible."""
         model_cfg = self.config['model']
         if model_cfg['kind'] != self.kind:
-            raise ValueError(f"Model kind '{model_cfg['kind']}' is not compatible with OLSModel.")
+            raise ValueError(f"Model kind '{model_cfg['kind']}' is not compatible with LogitModel.")
     
     def _validate_columns(self, df, cols, df_name):
         """
@@ -157,9 +166,9 @@ class OLSModel(twm.InferenceModel):
         if len(self.df) == 0:
             raise ValueError("Merge resulted in an empty DataFrame. Check ID fields.")
         
-        # Use continuous target variable for OLS regression
-        self.y = self.df[data_cfg['target']].values
-        self.logger.info(f"Target variable statistics: mean={np.mean(self.y):.3f}, std={np.std(self.y):.3f}")
+        # Create binary target variable
+        self.y = (self.df[data_cfg['target']] > 0).astype(int).values.reshape(-1, 1)
+        self.logger.info(f"Binary target distribution (0s, 1s): {np.bincount(self.y.ravel())}")
         
         return self._create_features()
     
@@ -220,18 +229,62 @@ class OLSModel(twm.InferenceModel):
     
     def _perform_diagnostics(self):
         """
-        Perform diagnostic tests on the OLS results.
+        Perform diagnostic tests on the regression results.
             
         Returns
         -------
         dict
             Dictionary containing diagnostic test results
         """
+        out_cfg = self.config['output']
         self.diagnostics = {}
-        results = self.results
         
         try:
-            pass #implement Moran's I test on residuals
+            self.logger.info("Performing diagnostic tests...")
+
+            # Moran's I for spatial autocorrelation of residuals (Spatial CV)
+            moran_test = Moran(self.residuals, self.w, permutations=9999)
+            self.diagnostics['moran_cv'] = {
+                'I': moran_test.I,
+                'EI': moran_test.EI,
+                'p_value': moran_test.p_sim,
+                'z_score': moran_test.z_sim
+            }
+            self.logger.info(f"Observed Moran's I: {moran_test.I}")
+            self.logger.info(f"Expected I under null: {moran_test.EI}")
+            self.logger.info(f"p-value: {moran_test.p_sim}")
+
+            # Interpret the p-value
+            if moran_test.p_sim <= 0.05:
+                self.logger.info("Result: Significant spatial autocorrelation in the residuals (Reject H0).")
+            else:
+                self.logger.info("Result: No significant spatial autocorrelation (Fail to reject H0).")
+
+            # You can also access the full distribution of permuted I values
+            import matplotlib.pyplot as plt
+            plot_path = os.path.join(out_cfg['outdir'], out_cfg['plots'], "moran_distribution.png")
+            os.makedirs(os.path.dirname(plot_path), exist_ok=True)
+            plt.hist(moran_test.sim, bins=50, color='lightblue')
+            plt.axvline(moran_test.I, color='red', linestyle='dashed')
+            plt.title("Reference Distribution of Moran's I under Null Hypothesis")
+            plt.xlabel("Moran's I Value")
+            plt.savefig(plot_path)
+            plt.close()
+            self.logger.info(f"Moran's I distribution plot saved to {plot_path}")
+
+            # Classification Report
+            from sklearn.metrics import classification_report
+            class_report = classification_report(
+                self.predictions['y_true'], 
+                self.predictions['y_pred'], 
+                output_dict=True
+            )
+            self.diagnostics['classification_report'] = class_report
+            report_path = os.path.join(out_cfg['outdir'], out_cfg['report'])
+            os.makedirs(os.path.dirname(report_path), exist_ok=True)
+            pd.DataFrame(class_report).transpose().to_csv(report_path, index=True)
+            self.logger.info(f"Classification report saved to {report_path}")
+
         except Exception as e:
             self.logger.warning(f"Error in diagnostic tests: {e}")
             self.diagnostics['error'] = str(e)
@@ -240,7 +293,7 @@ class OLSModel(twm.InferenceModel):
     
     def _train(self, X=None, y=None):
         """
-        Train the OLS model using statsmodels.
+        Train the Logit model using statsmodels.
         
         Parameters
         ----------
@@ -263,6 +316,7 @@ class OLSModel(twm.InferenceModel):
         train_cfg = self.config['training']
         model_cfg = self.config['model']
         data_cfg = self.config['data']
+        out_cfg = self.config['output']
 
         # Get coordinates for spatial CV
         coords = self.df[data_cfg['coord_cols']].values
@@ -288,11 +342,10 @@ class OLSModel(twm.InferenceModel):
         else:
             X_scaled = X.copy()
 
-        self.logger.info("Training OLS model using statsmodels...")
+        self.logger.info("Training Logit model using statsmodels...")
 
         records, cv_scores = [], []
         all_residuals = np.zeros(len(self.df))
-
         
         for fold in range(train_cfg['scv_folds']):
             self.logger.info(f"Processing fold {fold + 1}/{train_cfg['scv_folds']}...")
@@ -300,30 +353,34 @@ class OLSModel(twm.InferenceModel):
             X_train, X_test = X_scaled.iloc[train_idx], X_scaled.iloc[test_idx]
             y_train, y_test = y[train_idx].ravel(), y[test_idx].ravel()
 
-            # X_train_const = sm.add_constant(X_train)
-            # X_test_const = sm.add_constant(X_test)
+            X_train_const = sm.add_constant(X_train)
+            X_test_const = sm.add_constant(X_test)
             
-            cv_model = sm.OLS(y_train, X_train).fit()
-            cv_pred = cv_model.predict(X_test)
-            cv_score = r2_score(y_test, cv_pred)
-            cv_scores.append(cv_score)
+            cv_model = sm.Logit(y_train, X_train_const).fit()
+            cv_prob = cv_model.predict(X_test_const)
+            cv_pred = (cv_prob >= model_cfg['threshold']).astype(int)
+
+            cv_accuracy = accuracy_score(y_test, cv_pred)
+            cv_logloss = log_loss(y_test, cv_prob)
+            cv_scores.append({"Accuracy": cv_accuracy, "LogLoss": cv_logloss})
             
-            self.logger.info(f"  Fold {fold + 1} R²: {cv_score:.4f}")
+            self.logger.info(f"  Fold {fold + 1} LogLoss: {cv_logloss:.4f} Accuracy: {cv_accuracy:.4f}")
             
             # Store results and residuals
-            all_residuals[test_idx] = y_test - cv_pred
+            all_residuals[test_idx] = pearson_residuals(y_test, cv_prob)
             for i, idx in enumerate(test_idx):
                 records.append({
                     data_cfg['id_field']: self.df.iloc[idx][data_cfg['id_field']], 
                     "fold": fold,
                     "y_true": int(y_test[i]),
-                    "y_pred": cv_pred[idx]
+                    "y_prob": cv_prob[idx],
+                    "y_pred": int(cv_prob[idx] >= model_cfg['threshold']),
                 })
             
             # Store coefficients
             coef_df = pd.DataFrame({
                 'fold': fold,
-                'Feature': list(X.columns),
+                'Feature': ["intercept"] + list(X.columns),
                 'Coefficient': cv_model.params,
                 'Std_Error': cv_model.bse,
                 't_value': cv_model.tvalues,
@@ -331,22 +388,23 @@ class OLSModel(twm.InferenceModel):
                 'CI_Lower': cv_model.conf_int()[0],
                 'CI_Upper': cv_model.conf_int()[1]
             })
-            coef_df.to_csv(os.path.join(self.config['logging']['logdir'], f"fold_{fold+1}_ols_coefficients.csv"), index=False)
+            coef_df.to_csv(os.path.join(self.config['logging']['logdir'], f"fold_{fold+1}_coefficients.csv"), index=False)
 
-        self.logger.info(f"Cross-validation R² scores: {cv_scores}")
-        self.logger.info(f"Mean CV R² score: {np.mean(cv_scores):.4f} (±{np.std(cv_scores):.4f})")
+        self.logger.info(f"Cross-validation scores: {cv_scores}")
         
-        # Fit OLS model using statsmodels
-        self.model = sm.OLS(y, X_scaled)
+        # Fit Logit model using statsmodels
+        X_scaled_const = sm.add_constant(X_scaled)
+
+        self.model = sm.Logit(y, X_scaled_const)
         self.results = self.model.fit()
-        self.parameters = self.results.params
+        self.residuals = all_residuals
         
         self.logger.info("Model training complete.")
         self.logger.info(f"\nModel Summary:\n{self.results.summary()}")
         
         # Extract coefficients with statistical significance
         coefficients_df = pd.DataFrame({
-            'Feature': list(X.columns),
+            'Feature': ["intercept"] + list(X.columns),
             'Coefficient': self.results.params,
             'Std_Error': self.results.bse,
             't_value': self.results.tvalues,
@@ -364,6 +422,17 @@ class OLSModel(twm.InferenceModel):
             include_lowest=True
         )
         
-        self.logger.info(f"\nModel Coefficients:\n{coefficients_df}")
+        # Save coefficients
+        self.parameters = coefficients_df
+        coef_path = os.path.join(out_cfg['outdir'], out_cfg['coefficients'])
+        os.makedirs(out_cfg['outdir'], exist_ok=True)
+        coefficients_df.to_csv(coef_path, index=False)
+        self.logger.info(f"Model coefficients saved to {coef_path}")
+
+        # Save Predictions
+        self.predictions = pd.DataFrame(records)
+        pred_path = os.path.join(out_cfg['outdir'], out_cfg['predictions'])
+        self.predictions.to_csv(pred_path, index=False)
+        self.logger.info(f"Predictions saved to {pred_path}")
         
-        return self.results, coefficients_df
+        return self.results
