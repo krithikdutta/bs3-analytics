@@ -24,24 +24,24 @@ training:
 
 # Model parameters
 model:
-  name: 'SLX_v1'
+  name: 'Logit_v2'
   kind: 'inference'
   link: 'logit'
   threshold: 0.5
   scale: True
-  lag_order: 1
+  lag_order: 0
 
 # Output parameters
 output:
   outdir: 'out'
-  model: 'trained_model.pkl'
+  plots: 'diagnostic_plots'
   coefficients: 'model_coefficients.csv'
-  weights: 'spatial_weights.pkl'
-  report: 'evaluation_report.txt'
+  report: 'evaluation_report.csv'
   predictions: 'predictions.csv'
+  diagnostics: 'diagnostics.yaml'
 
 # Logging and checkpoints
 logging:
   logdir: 'logs'
-  logpath: 'training.log'
+  logpath: 'weightedlogit.log'
   level: 'info'

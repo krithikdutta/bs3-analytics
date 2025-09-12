@@ -38,7 +38,7 @@ output:
   coefficients: 'model_coefficients.csv'
   report: 'evaluation_report.csv'
   predictions: 'predictions.csv'
-  diagnostics: 'diagnostics.yaml'
+  diagnostics: 'diagnostics.csv'
 
 # Logging and checkpoints
 logging:
