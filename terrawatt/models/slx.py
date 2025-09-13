@@ -18,7 +18,7 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.cluster import KMeans
-from sklearn.metrics import roc_auc_score, accuracy_score, log_loss, precision_score, recall_score, f1_score, confusion_matrix, classification_report
+from sklearn.metrics import roc_auc_score, accuracy_score, log_loss, precision_score, recall_score, f1_score, confusion_matrix
 
 from spreg import Probit
 from libpysal.weights import Queen, KNN
@@ -581,11 +581,11 @@ class SLXLogitModel(twm.PredictionModel):
     
 
 class SLXModel(twm.InferenceModel):
-    """Spatial Lag of X Logistic Regression Model for inference."""
+    """Spatial Lag of X Probit Regression Model for inference."""
     
     def __init__(self, config_path="config.yaml"):
         """
-        Initialize the SLX Logit model.
+        Initialize the SLX Probit model.
         
         Parameters
         ----------
@@ -628,13 +628,13 @@ class SLXModel(twm.InferenceModel):
         )
         
         self.logger = logging.getLogger(__name__)
-        self.logger.info("SLX Logit Model initialized")
+        self.logger.info("SLX Probit Model initialized")
 
     def _check_compatibility(self):
         """Check if the model kind is compatible."""
         model_cfg = self.config['model']
         if model_cfg['kind'] != self.kind:
-            raise ValueError(f"Model kind '{model_cfg['kind']}' is not compatible with SLXLogitModel.")
+            raise ValueError(f"Model kind '{model_cfg['kind']}' is not compatible with SLXProbitModel.")
     
     def _validate_columns(self, df, cols, df_name):
         """
@@ -843,18 +843,14 @@ class SLXModel(twm.InferenceModel):
                 'p_value': self.model.LR[1],
             }
 
-            self.logger.info("Diagnostic test results:")
-            for test, result in self.diagnostics.items():
-                self.logger.info(f"  {test}: Statistic={result['stat']}, p-value={result['p_value']}")
-
-            # diagnostics_df = pd.DataFrame(
-            #     {k: [v['stat'], v['p_value']] for k, v in self.diagnostics.items()},
-            #     index=['Statistic', 'p-value']
-            # )
-            # diag_path = os.path.join(out_cfg['outdir'], out_cfg['diagnostics'])
-            # os.makedirs(os.path.dirname(diag_path), exist_ok=True)
-            # diagnostics_df.to_csv(diag_path, index=True)
-            # self.logger.info(f"Diagnostics saved to {diag_path}")
+            diagnostics_df = pd.DataFrame(
+                {k: [v['stat'], v['p_value']] for k, v in self.diagnostics.items()},
+                index=['Statistic', 'p-value']
+            )
+            diag_path = os.path.join(out_cfg['outdir'], out_cfg['diagnostics'])
+            os.makedirs(os.path.dirname(diag_path), exist_ok=True)
+            diagnostics_df.to_csv(diag_path, index=True)
+            self.logger.info(f"Diagnostics saved to {diag_path}")
 
         except Exception as e:
             self.logger.warning(f"Error in diagnostic tests: {e}")
@@ -924,9 +920,6 @@ class SLXModel(twm.InferenceModel):
         self.logger.info("Model training complete.")
         self.logger.info(f"\nModel Summary:\n{self.results}")
 
-        # self.logger.info(len(self.model.betas.flatten()))
-        # self.logger.info(len(self.model.std_err.flatten()))
-        # self.logger.info(len(self.model.name_x))
         
         # Extract coefficients with statistical significance
         coefficients_df = pd.DataFrame({
