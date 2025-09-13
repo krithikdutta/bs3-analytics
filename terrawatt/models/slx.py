@@ -765,8 +765,8 @@ class SLXModel(twm.InferenceModel):
                     self.logger.info(f"Filled {X_raw[col].isna().sum()} NaNs in '{col}' using {feature_cfg['imputer']}.")
         
         # Create spatially lagged features
-        X_lag = pd.DataFrame({f"W_{col}": lag_spatial(self.w, X_raw[col].values) for col in X_raw.columns})
-        self.X_all = pd.concat([X_raw, X_lag], axis=1)
+        # X_lag = pd.DataFrame({f"W_{col}": lag_spatial(self.w, X_raw[col].values) for col in X_raw.columns})
+        self.X_all = X_raw  # No lagged features for inference
         self.logger.info(f"Final feature matrix shape: {self.X_all.shape}")
         
         return self.X_all, self.y
