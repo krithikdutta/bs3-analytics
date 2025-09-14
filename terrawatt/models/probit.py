@@ -19,7 +19,7 @@ import statsmodels.api as sm
 from sklearn.cluster import KMeans
 
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
-from sklearn.metrics import accuracy_score, log_loss
+from sklearn.metrics import accuracy_score, log_loss, classification_report
 
 from libpysal.weights import Queen, KNN
 from esda.moran import Moran
@@ -269,7 +269,6 @@ class ProbitModel(twm.InferenceModel):
             self.logger.info(f"Moran's I distribution plot saved to {plot_path}")
 
             # Classification Report
-            from sklearn.metrics import classification_report
             class_report = classification_report(
                 self.predictions['y_true'], 
                 self.predictions['y_pred'], 
@@ -352,7 +351,7 @@ class ProbitModel(twm.InferenceModel):
             X_train_const = sm.add_constant(X_train)
             X_test_const = sm.add_constant(X_test)
             
-            cv_model = sm.Probit(y_train, X_train_const).fit()
+            cv_model = sm.GLM(y_train, X_train_const, family=sm.families.Binomial(link=sm.families.links.probit())).fit()
             cv_prob = cv_model.predict(X_test_const)
             cv_pred = (cv_prob >= model_cfg['threshold']).astype(int)
 
@@ -391,7 +390,7 @@ class ProbitModel(twm.InferenceModel):
         # Fit Logit model using statsmodels
         X_scaled_const = sm.add_constant(X_scaled)
 
-        self.model = sm.Probit(y, X_scaled_const)
+        self.model = sm.GLM(y, X_scaled_const, family=sm.families.Binomial(link=sm.families.links.probit()))
         self.results = self.model.fit()
         self.residuals = all_residuals
         
