@@ -3,12 +3,14 @@ data:
   datadir: 'data'
   xtrain_path: 'BLR_X_normalized.csv'
   ytrain_path: 'BLR_Y.csv'
-  xval_path: 'RPR_X_normalized.csv'
+  xval_path: 'DEL_X_normalized.csv'
+  yval_path: 'DEL_Y.csv'
+  xpred_path: 'RPR_X_normalized.csv'
   predictors: ['ndbi_mean', 'ntl_mean', 'ghi_mean', 'road_density_norm', 'poi_norm']
   target: 'num_bss'
   id_field: 'id'
   coord_cols: ['Longitude', 'Latitude']
-  bbox_cols: ['left', 'top', 'right', 'bottom']
+  bbox_cols: ['left', 'bottom', 'right', 'top']
 
 # Feature Engineering parameters
 feature:
@@ -33,12 +35,12 @@ model:
 
 # Output parameters
 output:
-  outdir: 'out_logit'
+  outdir: 'out'
   plots: 'diagnostic_plots'
   coefficients: 'model_coefficients.csv'
   report: 'evaluation_report.csv'
   predictions: 'predictions.csv'
-  diagnostics: 'diagnostics.yaml'
+  diagnostics: 'diagnostics.csv'
 
 # Logging and checkpoints
 logging:

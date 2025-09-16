@@ -313,7 +313,7 @@ class SLXLogitModel(SpatialModel):
         
         # Create results DataFrame
         results = pd.DataFrame({
-            'id': self.test.df[self.id_field],
+            'id': X_new[self.id_field],
             'probability': probabilities,
             'prediction': predictions
         })
@@ -858,3 +858,38 @@ class SLXProbitModel(SpatialModel):
         
         # Return the diagnostics from the comprehensive test
         return self._perform_diagnostics()
+
+
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler  # Always scale data for regularized models!
+
+# Create a pipeline to ensure scaling is done correctly within each CV fold
+pipe = Pipeline([
+    ('scaler', StandardScaler()),  # Critical for regularization
+    ('model', LogisticRegression(random_state=42, max_iter=1000)) # Increase max_iter to ensure convergence
+])
+
+# Define the parameter grid
+param_grid = {
+    'model__C': [0.001, 0.01, 0.1, 1, 10, 100],  # Test a wide range
+    'model__penalty': ['l1', 'l2'],               # Test both regularizations
+    'model__solver': ['liblinear', 'saga'],       # Solvers that work with L1
+    'model__class_weight': [None, 'balanced', {0: 1, 1: 5}, {0: 1, 1: 10}] # Focus on imbalance
+}
+
+# Initialize the grid search.
+# Use your preferred CV strategy from the previous answer (e.g., LeaveOneGroupOut)
+# Use scoring='average_precision' or 'f1' for imbalanced data
+grid_search = GridSearchCV(estimator=pipe,
+                           param_grid=param_grid,
+                           cv=your_cv_strategy,  # This is your LOCO or Spatial CV
+                           scoring='average_precision', # Highly recommended for imbalance
+                           n_jobs=-1,
+                           verbose=1)
+
+# Fit the model
+grid_search.fit(X, y, groups=city_labels) # Pass city labels for LOCO CV
+
+print("Best parameters:", grid_search.best_params_)
+print("Best score:", grid_search.best_score_)
