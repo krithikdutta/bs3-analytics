@@ -33,7 +33,7 @@ def pearson_residuals(y, y_hat):
     return (y - y_hat) / np.sqrt(y_hat * (1 - y_hat))
 
 
-class WLogitModel(twm.InferenceModel):
+class WLogitModel(twm.SpatialModel):
     """Weighted Logistic Regression Model using statsmodels."""
 
     def __init__(self, config_path="config.yaml"):
@@ -45,17 +45,7 @@ class WLogitModel(twm.InferenceModel):
         config_path : str, optional
             Path to the configuration YAML file (default is "config.yaml")
         """
-        super().__init__()
-        self.config = None
-        self.model = None
-        self.results = None
-        self.scaler = None
-        self.logger = None
-        self.weights = None
-        self.X_all = None
-        self.y = None
-        self.df = None
-        self.w = None
+        super().__init__(config_path)
         self.residuals = None
         self.predictions = None
         
@@ -423,6 +413,9 @@ class WLogitModel(twm.InferenceModel):
         
         self.logger.info("Model training complete.")
         self.logger.info(f"\nModel Summary:\n{self.results.summary()}")
+        self.logger.info(f"Model BIC: {self.results.bic}")
+        self.logger.info(f"Model AfIC: {self.results.aic}")
+        self.logger.info(f"Model Log-Likelihood: {self.results.llf}")
         
         # Extract coefficients with statistical significance
         coefficients_df = pd.DataFrame({

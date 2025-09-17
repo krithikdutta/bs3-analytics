@@ -213,6 +213,9 @@ class LogitModel(twm.SpatialModel):
 
         self.model = sm.GLM(y, X_scaled_const, family=sm.families.Binomial())
         self.results = self.model.fit()
+        self.logger.info(f"Model BIC: {self.results.bic}")
+        self.logger.info(f"Model AIC: {self.results.aic}")
+        self.logger.info(f"Model Log-Likelihood: {self.results.llf}")
         self.residuals = all_residuals
         
         self.logger.info("Model training complete.")

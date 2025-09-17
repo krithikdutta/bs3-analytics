@@ -251,29 +251,65 @@ class SLXLogitModel(SpatialModel):
         }
     
     def _evaluate(self) -> None:
-        """Evaluate model performance using cross-validation results."""
-        if not hasattr(self, '_training_predictions') or self._training_predictions.empty:
-            raise ValueError("No training predictions available for evaluation")
+        """Evaluate model performance using cross-validation results and validation dataset."""
+        if not self._is_fitted:
+            raise ValueError("Model has not been trained. Call train() first.")
         
-        pred_df = self._training_predictions
-        y_true = pred_df["y_true"].values
-        y_prob = pred_df["y_prob"].values  
-        y_pred = pred_df["y_pred"].values
+        self._load_test_validation_data()
+        X_new = self.validation.X.copy()
+        
+        # Ensure column order matches training data
+        feature_cols_training = list(self.train.X.columns)
+        missing_cols = set(feature_cols_training) - set(X_new.columns)
+        if missing_cols:
+            self.logger.warning(f"Missing features in prediction data: {missing_cols}")
+            for col in missing_cols:
+                X_pred_features[col] = 0
+        
+        # Reorder columns to match training
+        X_pred_features = X_new[feature_cols_training]
+        
+        # Make predictions
+        try:
+            self.logger.info("Making predictions...")
+            probabilities = self.pipeline.predict_proba(X_pred_features)[:, 1]
+            threshold = self.config['model'].get('threshold', 0.5)
+            predictions = (probabilities >= threshold).astype(int)
+        except Exception as e:
+            raise RuntimeError(f"Error making predictions: {e}")
+    
+        y_true = self.validation.y
         
         try:
+            # Create results DataFrame
+            results = pd.DataFrame({
+                'id': self.validation.df[self.id_field],
+                'probability': probabilities,
+                'prediction': predictions
+            })
+
+            # Save predictions using parent class output configuration
+            output_cfg = self.config['output']
+            output_dir = Path(output_cfg['outdir'])
+            output_dir.mkdir(parents=True, exist_ok=True)
+            
+            output_path = output_dir / output_cfg.get('validation', 'validation.csv')
+            results.to_csv(output_path, index=False)
+            self.logger.info(f"Predictions saved to {output_path}")
+
             # Calculate metrics using parent class structure
             self.metrics = ModelMetrics(
-                pr_auc=float(average_precision_score(y_true, y_prob)),
-                brier_score=float(brier_score_loss(y_true, y_pred)),
-                log_loss=float(log_loss(y_true, y_prob)),
-                precision=float(precision_score(y_true, y_pred, zero_division=0)),
-                recall=float(recall_score(y_true, y_pred, zero_division=0)),
-                f1_score=float(f1_score(y_true, y_pred, zero_division=0)),
-                confusion_matrix=confusion_matrix(y_true, y_pred).tolist(),
-                classification_report=classification_report(y_true, y_pred)
+                pr_auc=float(average_precision_score(y_true, probabilities)),
+                brier_score=float(brier_score_loss(y_true, predictions)),
+                log_loss=float(log_loss(y_true, probabilities)),
+                precision=float(precision_score(y_true, predictions, zero_division=0)),
+                recall=float(recall_score(y_true, predictions, zero_division=0)),
+                f1_score=float(f1_score(y_true, predictions, zero_division=0)),
+                confusion_matrix=confusion_matrix(y_true, predictions).tolist(),
+                classification_report=classification_report(y_true, predictions)
             )
             
-            self.logger.info("Evaluation Metrics:")
+            self.logger.info("Cross-Validation Metrics:")
             self.logger.info(f"  PR AUC: {self.metrics.pr_auc:.4f}")
             self.logger.info(f"  Brier Score Loss: {self.metrics.brier_score:.4f}")
             self.logger.info(f"  Precision: {self.metrics.precision:.4f}")

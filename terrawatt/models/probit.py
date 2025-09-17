@@ -61,10 +61,10 @@ class ProbitModel(twm.SpatialModel):
             (predictions_df, coefficients_df, metrics_dict)
         """
         if X is None or y is None:
-            if self.X is None or self.y is None:
+            if self.train.raw_X is None or self.train.y is None:
                 raise ValueError("No data available. Call load_data() first or provide X and y.")
-            X = self.X
-            y = self.y
+            X = self.train.raw_X
+            y = self.train.y
         
         train_cfg = self.config['training']
         model_cfg = self.config['model']
@@ -72,7 +72,7 @@ class ProbitModel(twm.SpatialModel):
         out_cfg = self.config['output']
 
         # Get coordinates for spatial CV
-        coords = self.df[data_cfg['coord_cols']].values
+        coords = self.train.df[data_cfg['coord_cols']].values
         
         self.logger.info(f"Creating {train_cfg['scv_folds']} spatial folds using KMeans clustering...")
         kmeans = KMeans(n_clusters=train_cfg['scv_folds'], random_state=42, n_init='auto')
@@ -98,7 +98,7 @@ class ProbitModel(twm.SpatialModel):
         self.logger.info("Training Logit model using statsmodels...")
 
         records, cv_scores = [], []
-        all_residuals = np.zeros(len(self.df))
+        all_residuals = np.zeros(len(self.train.df))
         
         for fold in range(train_cfg['scv_folds']):
             self.logger.info(f"Processing fold {fold + 1}/{train_cfg['scv_folds']}...")
@@ -123,7 +123,7 @@ class ProbitModel(twm.SpatialModel):
             all_residuals[test_idx] = pearson_residuals(y_test, cv_prob)
             for i, idx in enumerate(test_idx):
                 records.append({
-                    data_cfg['id_field']: self.df.iloc[idx][data_cfg['id_field']], 
+                    data_cfg['id_field']: self.train.df.iloc[idx][data_cfg['id_field']], 
                     "fold": fold,
                     "y_true": int(y_test[i]),
                     "y_prob": cv_prob[idx],
@@ -154,6 +154,9 @@ class ProbitModel(twm.SpatialModel):
         
         self.logger.info("Model training complete.")
         self.logger.info(f"\nModel Summary:\n{self.results.summary()}")
+        self.logger.info(f"Model BIC: {self.results.bic}")
+        self.logger.info(f"Model AIC: {self.results.aic}")
+        self.logger.info(f"Model Log-Likelihood: {self.results.llf}")
         
         # Extract coefficients with statistical significance
         coefficients_df = pd.DataFrame({
@@ -206,7 +209,7 @@ class ProbitModel(twm.SpatialModel):
             self.logger.info("Performing diagnostic tests...")
 
             # Moran's I for spatial autocorrelation of residuals (Spatial CV)
-            moran_test = Moran(self.residuals, self.w, permutations=9999)
+            moran_test = Moran(self.residuals, self.train.w, permutations=9999)
             diagnostics['moran_cv'] = {
                 'I': moran_test.I,
                 'EI': moran_test.EI,

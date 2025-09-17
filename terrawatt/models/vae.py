@@ -9,6 +9,7 @@ from typing import Optional, Dict, Any
 
 import numpy as np
 import pandas as pd
+from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import roc_auc_score, average_precision_score, log_loss, brier_score_loss, precision_score, recall_score, f1_score, confusion_matrix, classification_report
 
 import torch
@@ -128,9 +129,13 @@ class SpatialVAEModel(SpatialModel):
             self._load_data()
 
         self.logger.info("Starting VAE model training...")
+
+        # Filter for non-anomalous data (y=0)
+        normal_indices = np.where(self.train.y == 0)[0]
+        normal_X = self.train.X.iloc[normal_indices]
         
         # Prepare data for PyTorch
-        X_tensor = torch.tensor(self.train.X.values, dtype=torch.float32)
+        X_tensor = torch.tensor(normal_X.values, dtype=torch.float32)
         dataset = TensorDataset(X_tensor)
         dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
         
@@ -176,15 +181,25 @@ class SpatialVAEModel(SpatialModel):
             anomaly_scores = ((recon - X_tensor)**2).mean(axis=1).numpy()
             
         y_true = (self.validation.df[self.target_name] > 0).astype(int).values
+
+        # Reshape for scaling
+        anomaly_scores_reshaped = anomaly_scores.reshape(-1, 1)
+        
+        # Scale anomaly scores to a range of [0, 1]
+        scaler = MinMaxScaler()
+        scaled_scores = scaler.fit_transform(anomaly_scores_reshaped)
+        scaled_anomaly_scores = scaled_scores.flatten()
         
         # Calculate evaluation metrics
         try:
-            auc_score = float(roc_auc_score(y_true, anomaly_scores))
-            pr_auc = float(average_precision_score(y_true, anomaly_scores))
+            auc_score = float(roc_auc_score(y_true, scaled_anomaly_scores))
+            pr_auc = float(average_precision_score(y_true, scaled_anomaly_scores))
             
             # Determine a threshold for classification (e.g., 95th percentile)
-            threshold = np.percentile(anomaly_scores, 95)
-            y_pred = (anomaly_scores > threshold).astype(int)
+            # threshold = np.percentile(scaled_anomaly_scores, 95)
+            threshold = 2  # Fixed threshold for classification
+            self.logger.info(f"Anomaly score threshold set at: {threshold:.4f}")
+            y_pred = (anomaly_scores_reshaped > threshold).astype(int)
             
             # Calculate other classification metrics
             conf_matrix = confusion_matrix(y_true, y_pred).tolist()
@@ -196,8 +211,8 @@ class SpatialVAEModel(SpatialModel):
 
             self.metrics = ModelMetrics(
                 pr_auc=pr_auc,
-                brier_score=brier_score_loss(y_true, anomaly_scores),
-                log_loss=log_loss(y_true, anomaly_scores),
+                brier_score=brier_score_loss(y_true, scaled_anomaly_scores),
+                log_loss=log_loss(y_true, scaled_anomaly_scores),
                 precision=precision,
                 recall=recall,
                 f1_score=f1,

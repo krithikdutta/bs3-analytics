@@ -141,6 +141,9 @@ class OLSModel(twm.SpatialModel):
         
         self.logger.info("Model training complete.")
         self.logger.info(f"\nModel Summary:\n{self.results.summary()}")
+        self.logger.info(f"Model BIC: {self.results.bic}")
+        self.logger.info(f"Model AIC: {self.results.aic}")
+        self.logger.info(f"Model Log-Likelihood: {self.results.llf}")
         
         # Extract coefficients with statistical significance
         coefficients_df = pd.DataFrame({

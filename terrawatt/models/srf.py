@@ -13,7 +13,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.cluster import KMeans
 from sklearn.metrics import (
-    roc_auc_score, accuracy_score, log_loss, precision_score, 
+    average_precision_score, brier_score_loss, log_loss, precision_score, 
     recall_score, f1_score, confusion_matrix, classification_report
 )
 from sklearn.base import BaseEstimator, TransformerMixin
@@ -210,7 +210,7 @@ class SpatialRandomForestModel(SpatialModel):
             
             # Calculate AUC
             if len(np.unique(y_test)) > 1:
-                auc = roc_auc_score(y_test, prob)
+                auc = average_precision_score(y_test, prob)
                 fold_aucs.append(auc)
                 self.logger.info(f"  Fold {fold + 1}: AUC={auc:.4f}")
             else:
@@ -297,8 +297,8 @@ class SpatialRandomForestModel(SpatialModel):
         try:
             # Calculate metrics using parent class structure
             self.metrics = ModelMetrics(
-                overall_auc=float(roc_auc_score(y_true, y_prob)),
-                overall_accuracy=float(accuracy_score(y_true, y_pred)),
+                pr_auc=float(average_precision_score(y_true, y_prob)),
+                brier_score=float(brier_score_loss(y_true, y_pred)),
                 log_loss=float(log_loss(y_true, y_prob)),
                 precision=float(precision_score(y_true, y_pred, zero_division=0)),
                 recall=float(recall_score(y_true, y_pred, zero_division=0)),
@@ -308,8 +308,8 @@ class SpatialRandomForestModel(SpatialModel):
             )
             
             self.logger.info("Evaluation Metrics:")
-            self.logger.info(f"  AUC: {self.metrics.overall_auc:.4f}")
-            self.logger.info(f"  Accuracy: {self.metrics.overall_accuracy:.4f}")
+            self.logger.info(f"  AUC: {self.metrics.pr_auc:.4f}")
+            self.logger.info(f"  Accuracy: {self.metrics.brier_score:.4f}")
             self.logger.info(f"  Precision: {self.metrics.precision:.4f}")
             self.logger.info(f"  Recall: {self.metrics.recall:.4f}")
             self.logger.info(f"  F1-Score: {self.metrics.f1_score:.4f}")
@@ -472,8 +472,8 @@ class SpatialRandomForestModel(SpatialModel):
                 # Performance Metrics
                 f.write("PERFORMANCE METRICS\n")
                 f.write("-" * 30 + "\n")
-                f.write(f"AUC-ROC: {self.metrics.overall_auc:.4f}\n")
-                f.write(f"Accuracy: {self.metrics.overall_accuracy:.4f}\n")
+                f.write(f"AUC-PR: {self.metrics.pr_auc:.4f}\n")
+                f.write(f"Brier Score: {self.metrics.brier_score:.4f}\n")
                 f.write(f"Precision: {self.metrics.precision:.4f}\n")
                 f.write(f"Recall: {self.metrics.recall:.4f}\n")
                 f.write(f"F1-Score: {self.metrics.f1_score:.4f}\n\n")

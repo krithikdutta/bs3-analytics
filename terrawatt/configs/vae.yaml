@@ -34,6 +34,7 @@ model:
   lag_order: 1
   latent_dim: 2
   epochs: 50
+  classification_loss_weight: 3.0
 
 # Output parameters
 output:
