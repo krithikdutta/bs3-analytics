@@ -26,8 +26,8 @@ class Dataset:
 @dataclass
 class ModelMetrics:
     """Data class to hold model evaluation metrics."""
-    overall_auc: float
-    overall_accuracy: float
+    pr_auc: float
+    brier_score: float
     log_loss: float
     precision: float
     recall: float

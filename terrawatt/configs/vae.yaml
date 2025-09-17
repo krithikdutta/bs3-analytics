@@ -32,6 +32,8 @@ model:
   threshold: 0.5
   scale: True
   lag_order: 1
+  latent_dim: 2
+  epochs: 50
 
 # Output parameters
 output:
